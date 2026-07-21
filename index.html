@@ -266,17 +266,17 @@ function autoTitle(rec){
 const GKEY="en_gkey";
 const getKey=()=>{try{return localStorage.getItem(GKEY)||"";}catch(e){return "";}};
 const proOn=()=>!!getKey();
-/* daily free-quota tracking: Flash-Lite 1000 req/day, 10s chunks = 6 req/min ≈ 166 min/day */
-const DAY_REQ=1000, REQ_PER_MIN=6;
-function usageCount(){try{const o=JSON.parse(localStorage.getItem("en_usage")||"{}");return o.d===new Date().toDateString()?o.n:0;}catch(e){return 0;}}
-function bumpUsage(){try{const d=new Date().toDateString();const o=JSON.parse(localStorage.getItem("en_usage")||"{}");localStorage.setItem("en_usage",JSON.stringify({d,n:(o.d===d?o.n:0)+1}));}catch(e){} updateQuota();}
-function minsLeft(){return Math.max(0,Math.floor((DAY_REQ-usageCount())/REQ_PER_MIN));}
+/* daily free-quota tracking (estimated, minutes of AI transcription) */
+const DAY_MIN=240;
+function usedMin(){try{const o=JSON.parse(localStorage.getItem("en_usage")||"{}");return o.d===new Date().toDateString()?(o.m||0):0;}catch(e){return 0;}}
+function bumpMin(){try{const d=new Date().toDateString();const o=JSON.parse(localStorage.getItem("en_usage")||"{}");localStorage.setItem("en_usage",JSON.stringify({d,m:(o.d===d?(o.m||0):0)+1}));}catch(e){} updateQuota();}
+function minsLeft(){return Math.max(0,DAY_MIN-usedMin());}
 function updateQuota(){
   const q=$("quota"); if(!q)return;
   if(proOn()){
     q.style.display="flex";
     $("quotaTxt").textContent="~"+minsLeft()+" min";
-    $("quotaBar").style.width=Math.max(0,100-(usageCount()/DAY_REQ*100))+"%";
+    $("quotaBar").style.width=Math.max(0,100-(usedMin()/DAY_MIN*100))+"%";
   } else q.style.display="none";
 }
 function proStatus(){
@@ -346,7 +346,6 @@ const T_PROMPT="Transcribe this audio verbatim. The speech may mix English, Chin
 let pending=0, draft="";
 async function transcribeChunk(blob,t0,recId){
   pending++;
-  bumpUsage();
   try{
     const b64=await blobToWavB64(blob);
     const text=(await gemini([{inline_data:{mime_type:"audio/wav",data:b64}},{text:T_PROMPT}],T_MODELS)).trim();
@@ -394,6 +393,102 @@ function spawnChunk(){
     if(b.size>2000) transcribeChunk(b,Math.max(0,t0),savedRecId);
   };
   cr.start(); chunkRec=cr;
+}
+/* ===== Live streaming transcription (~1s latency) via Gemini Live API ===== */
+const LIVE_MODELS=["gemini-live-2.5-flash","gemini-live-2.5-flash-preview","gemini-2.5-flash-native-audio-latest","gemini-2.5-flash-preview-native-audio-dialog","gemini-2.0-flash-live-001"];
+let ws=null,wsReady=false,liveIdx=0,liveSetupOk=false,liveCtx=null,liveNode=null,liveSrc=null,liveGain=null;
+let liveBuf="",liveT0=0,liveMode=false,liveFail=false,usageTimer=null;
+function flushLive(){
+  const t=liveBuf.trim();
+  if(t){ segments.push({t:liveT0,text:t}); segments.sort((a,b)=>a.t-b.t); }
+  liveBuf=""; draft="";
+  if(recActive) renderLive();
+}
+function openWS(){
+  const model=LIVE_MODELS[liveIdx];
+  liveSetupOk=false; wsReady=false;
+  try{
+    ws=new WebSocket("wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key="+encodeURIComponent(getKey()));
+  }catch(e){ liveFallback(); return; }
+  ws.onopen=()=>{
+    try{ws.send(JSON.stringify({setup:{
+      model:"models/"+model,
+      generationConfig:{responseModalities:["TEXT"]},
+      systemInstruction:{parts:[{text:"You are a silent transcription service. Never reply to the audio. Output nothing."}]},
+      inputAudioTranscription:{},
+      contextWindowCompression:{slidingWindow:{}}
+    }}));}catch(e){}
+  };
+  ws.onmessage=async ev=>{
+    let d=ev.data; if(d&&d.text) d=await d.text();
+    let m; try{m=JSON.parse(d);}catch(e){return;}
+    if(m.setupComplete){ wsReady=true; liveSetupOk=true; return; }
+    const sc=m.serverContent;
+    if(!sc)return;
+    if(sc.inputTranscription&&sc.inputTranscription.text){
+      if(!liveBuf) liveT0=Math.max(0,elapsed()-1.5);
+      liveBuf+=sc.inputTranscription.text;
+      draft=liveBuf;
+      if(recActive) renderLive();
+      if(liveBuf.length>400) flushLive();
+    }
+    if(sc.turnComplete) flushLive();
+  };
+  ws.onclose=()=>{
+    wsReady=false;
+    if(!recActive||!liveMode) return;
+    if(!liveSetupOk){
+      liveIdx++;
+      if(liveIdx<LIVE_MODELS.length) openWS();
+      else liveFallback();
+    } else { flushLive(); openWS(); } // reconnect mid-recording
+  };
+  ws.onerror=()=>{};
+}
+function startPump(){
+  liveCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
+  liveSrc=liveCtx.createMediaStreamSource(stream);
+  liveNode=liveCtx.createScriptProcessor(4096,1,1);
+  const rate=liveCtx.sampleRate;
+  liveNode.onaudioprocess=e=>{
+    if(!wsReady||paused||!ws||ws.readyState!==1)return;
+    let f=e.inputBuffer.getChannelData(0);
+    if(rate!==16000){
+      const ratio=rate/16000, n=Math.floor(f.length/ratio), g=new Float32Array(n);
+      for(let i=0;i<n;i++) g[i]=f[Math.floor(i*ratio)];
+      f=g;
+    }
+    const i16=new Int16Array(f.length);
+    for(let i=0;i<f.length;i++){const s=Math.max(-1,Math.min(1,f[i]));i16[i]=s<0?s*0x8000:s*0x7FFF;}
+    const bytes=new Uint8Array(i16.buffer);
+    let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+    try{ws.send(JSON.stringify({realtimeInput:{audio:{data:btoa(bin),mimeType:"audio/pcm;rate=16000"}}}));}catch(e){}
+  };
+  liveGain=liveCtx.createGain(); liveGain.gain.value=0;
+  liveSrc.connect(liveNode); liveNode.connect(liveGain); liveGain.connect(liveCtx.destination);
+}
+function startLive(){
+  liveMode=true; liveBuf=""; liveT0=0;
+  openWS(); startPump();
+}
+function stopLive(){
+  if(!liveMode&&!ws&&!liveCtx) return;
+  liveMode=false;
+  flushLive();
+  if(ws){try{ws.onclose=null;ws.close();}catch(e){} ws=null;} wsReady=false;
+  [liveSrc,liveNode,liveGain].forEach(n=>{if(n){try{n.disconnect();}catch(e){}}});
+  liveSrc=liveNode=liveGain=null;
+  if(liveCtx){liveCtx.close().catch(()=>{}); liveCtx=null;}
+}
+function liveFallback(){
+  liveFail=true; liveMode=false;
+  [liveSrc,liveNode,liveGain].forEach(n=>{if(n){try{n.disconnect();}catch(e){}}});
+  if(liveCtx){liveCtx.close().catch(()=>{}); liveCtx=null;}
+  if(recActive){
+    toast("Live stream unavailable — using 10s AI chunks");
+    spawnChunk();
+    chunkTimer=setInterval(()=>{ if(recActive&&!paused){ try{chunkRec.stop();}catch(e){} spawnChunk(); } },10000);
+  }
 }
 function mdlite(t){
   const lines=t.split(/\r?\n/); let h="",inUl=false;
@@ -525,10 +620,13 @@ async function startRec(){
   analyser=audioCtx.createAnalyser(); analyser.fftSize=256;
   src.connect(analyser);
   drawWave();
-  startRecog();
+  if(!proOn()) startRecog();
   if(proOn()){
-    spawnChunk();
-    chunkTimer=setInterval(()=>{ if(recActive&&!paused){ try{chunkRec.stop();}catch(e){} spawnChunk(); } },10000);
+    if(liveFail){
+      spawnChunk();
+      chunkTimer=setInterval(()=>{ if(recActive&&!paused){ try{chunkRec.stop();}catch(e){} spawnChunk(); } },10000);
+    } else startLive();
+    usageTimer=setInterval(()=>{ if(recActive&&!paused) bumpMin(); },60000);
     toast("⚡ Speak any language — AI auto-detects");
   }
   if(navigator.wakeLock){ navigator.wakeLock.request("screen").then(w=>wakeLock=w).catch(()=>{}); }
@@ -543,7 +641,9 @@ function cleanup(){
   recActive=false;
   clearInterval(timerH); cancelAnimationFrame(rafH);
   clearInterval(chunkTimer); chunkTimer=null;
+  clearInterval(usageTimer); usageTimer=null;
   if(chunkRec){ chunkRec.onstop=null; try{chunkRec.stop();}catch(e){} chunkRec=null; }
+  stopLive();
   draft="";
   if(recog){try{recog.stop();}catch(e){} recog=null;}
   if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;}
@@ -563,6 +663,7 @@ async function stopSave(){
   const dur=elapsed();
   recActive=false;
   clearInterval(chunkTimer); chunkTimer=null;
+  stopLive();
   const finalChunk=chunkRec; chunkRec=null;
   await new Promise(res=>{
     mediaRec.onstop=res;
@@ -593,13 +694,14 @@ $("pauseBtn").addEventListener("click",()=>{
     try{mediaRec.pause();}catch(e){}
     if(recog){try{recog.stop();}catch(e){}}
     if(proOn()&&chunkRec){try{chunkRec.stop();}catch(e){} chunkRec=null;}
+    if(liveMode) flushLive();
     $("pauseBtn").textContent="▶";
     $("recBtn").classList.remove("pulse");
   } else {
     pausedTotal+=Date.now()-pausedAt; paused=false;
     try{mediaRec.resume();}catch(e){}
-    startRecog();
-    if(proOn())spawnChunk();
+    if(!proOn()) startRecog();
+    if(proOn()&&liveFail) spawnChunk();
     $("pauseBtn").textContent="⏸";
     $("recBtn").classList.add("pulse");
   }
