@@ -11,10 +11,10 @@
 <link rel="icon" href="icon.svg">
 <style>
   :root{
-    --bg:#0d0f14; --card:#161a22; --card2:#1d2230; --line:#262c3a;
-    --text:#eef1f6; --dim:#8a93a6; --accent:#ff5c5c; --accent2:#ff8f5c;
-    --green:#4cd97b; --blue:#5ca8ff; --amber:#ffc95c;
-    --radius:16px;
+    --bg:#0a0c11; --card:#13161e; --card2:#1b2030; --line:#242a38;
+    --text:#f2f4f9; --dim:#96a0b5; --accent:#ff5b6e; --accent2:#ffa25c;
+    --green:#3ddc84; --blue:#6aa8ff; --amber:#ffc95c;
+    --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.35);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
@@ -26,25 +26,29 @@
   }
   .view{display:none; max-width:560px; margin:0 auto; padding:16px 16px 120px; min-height:100vh}
   .view.active{display:block}
-  header{display:flex; align-items:center; justify-content:space-between; padding:8px 2px 16px}
-  h1{font-size:22px; font-weight:800; letter-spacing:-.3px}
-  h1 span{color:var(--accent)}
+  header{display:flex; align-items:center; justify-content:space-between; padding:10px 2px 18px}
+  h1{font-size:22px; font-weight:800; letter-spacing:-.3px; line-height:1.1}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sub{font-size:10px; color:var(--dim); letter-spacing:2px; text-transform:uppercase; margin-top:3px}
+  .badgeAuto{display:none; align-items:center; gap:5px; font-size:12px; color:var(--green); border:1px solid rgba(61,220,132,.35); background:rgba(61,220,132,.08); padding:6px 12px; border-radius:99px; white-space:nowrap}
   .pill{font-size:11px; color:var(--dim); border:1px solid var(--line); padding:4px 10px; border-radius:99px}
   select{background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:6px 8px; font-size:12px}
   .banner{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; font-size:13px; color:var(--dim); margin-bottom:14px; line-height:1.5}
   .banner b{color:var(--text)}
   .banner .x{float:right; color:var(--dim); font-size:16px; padding:0 4px; cursor:pointer}
   /* record area */
-  .recWrap{background:linear-gradient(160deg,var(--card),var(--card2)); border:1px solid var(--line); border-radius:20px; padding:18px; margin-bottom:18px}
+  .recWrap{background:linear-gradient(165deg,var(--card),var(--card2)); border:1px solid var(--line); border-radius:22px; padding:20px 18px; margin-bottom:18px; box-shadow:var(--shadow)}
   .timer{text-align:center; font-size:40px; font-weight:200; font-variant-numeric:tabular-nums; letter-spacing:2px; margin:4px 0 10px}
   canvas#wave{width:100%; height:56px; display:block; margin-bottom:10px}
   .live{min-height:64px; max-height:38vh; overflow-y:auto; font-size:16px; line-height:1.7; color:var(--dim); margin-bottom:14px; text-align:left; background:rgba(0,0,0,.18); border-radius:12px; padding:10px 12px}
   .live .fin{color:var(--text)}
   .live .int{color:var(--accent2)}
   .live.idle{text-align:center; background:none; color:var(--dim)}
-  .langChips{display:flex; gap:8px; margin-bottom:10px; justify-content:center; flex-wrap:wrap}
-  .lchip{background:var(--card); border:1px solid var(--line); color:var(--dim); border-radius:99px; padding:7px 16px; font-size:13px; cursor:pointer}
-  .lchip.on{background:var(--card2); color:var(--text); border-color:var(--accent); font-weight:600}
+  .quota{display:none; flex-direction:column; gap:6px; margin-top:14px; padding:10px 12px; background:rgba(0,0,0,.18); border-radius:12px}
+  .quota span{font-size:12px; color:var(--dim)}
+  .quota b{color:var(--green)}
+  .qtrack{height:5px; background:var(--line); border-radius:99px; overflow:hidden}
+  .qbar{height:100%; width:100%; background:linear-gradient(90deg,var(--green),var(--blue)); border-radius:99px; transition:width .4s}
   .ctrls{display:flex; align-items:center; justify-content:center; gap:26px}
   .recBtn{
     width:76px; height:76px; border-radius:50%; border:none; cursor:pointer;
@@ -76,9 +80,9 @@
   .dTitle{font-size:20px; font-weight:700; margin-bottom:2px; word-break:break-word}
   .dMeta{font-size:12px; color:var(--dim); margin-bottom:14px}
   audio{width:100%; margin-bottom:14px; border-radius:12px}
-  .tabs{display:flex; gap:8px; margin-bottom:14px}
-  .tab{flex:1; text-align:center; padding:10px; border-radius:12px; background:var(--card); border:1px solid var(--line); color:var(--dim); font-size:14px; cursor:pointer}
-  .tab.on{background:var(--card2); color:var(--text); border-color:#3a4256; font-weight:600}
+  .tabs{display:flex; gap:4px; margin-bottom:16px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:4px}
+  .tab{flex:1; text-align:center; padding:9px; border-radius:10px; color:var(--dim); font-size:13.5px; cursor:pointer}
+  .tab.on{background:var(--card2); color:var(--text); font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.3)}
   .panel{display:none}
   .panel.on{display:block}
   .sumCard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px}
@@ -105,8 +109,9 @@
 <!-- HOME -->
 <div class="view active" id="homeView">
   <header>
-    <h1>Echo<span>Note</span></h1>
+    <div><h1>Echo<span>Note</span></h1><div class="sub">AI Meeting Notes</div></div>
     <span style="display:flex;gap:8px;align-items:center">
+    <span id="autoBadge" class="badgeAuto">🌐 Auto-detect</span>
     <button id="proBtn" style="background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:99px;padding:6px 12px;font-size:12px;cursor:pointer">⚡ Pro</button>
     <select id="lang" title="Transcription language">
       <option value="en-US">English (US)</option>
@@ -145,11 +150,6 @@
   <div class="recWrap">
     <div class="timer" id="timer">00:00</div>
     <canvas id="wave"></canvas>
-    <div class="langChips" id="langChips">
-      <button class="lchip" data-l="en-US">English</button>
-      <button class="lchip" data-l="zh-CN">中文</button>
-      <button class="lchip" data-l="ms-MY">Melayu</button>
-    </div>
     <div class="live idle" id="live">Tap the mic to start recording</div>
     <div class="ctrls">
       <button class="sideBtn" id="pauseBtn" title="Pause">⏸</button>
@@ -157,6 +157,10 @@
       <button class="sideBtn" id="discardBtn" title="Discard">🗑</button>
     </div>
     <div class="hint" id="recHint">Records audio + live transcript. AI notes generated on save.</div>
+    <div class="quota" id="quota">
+      <span>⚡ <b id="quotaTxt"></b> of free AI transcription left today</span>
+      <div class="qtrack"><div class="qbar" id="quotaBar"></div></div>
+    </div>
   </div>
 
   <input class="search" id="search" placeholder="Search recordings & transcripts…">
@@ -262,12 +266,28 @@ function autoTitle(rec){
 const GKEY="en_gkey";
 const getKey=()=>{try{return localStorage.getItem(GKEY)||"";}catch(e){return "";}};
 const proOn=()=>!!getKey();
+/* daily free-quota tracking: Flash-Lite 1000 req/day, 10s chunks = 6 req/min ≈ 166 min/day */
+const DAY_REQ=1000, REQ_PER_MIN=6;
+function usageCount(){try{const o=JSON.parse(localStorage.getItem("en_usage")||"{}");return o.d===new Date().toDateString()?o.n:0;}catch(e){return 0;}}
+function bumpUsage(){try{const d=new Date().toDateString();const o=JSON.parse(localStorage.getItem("en_usage")||"{}");localStorage.setItem("en_usage",JSON.stringify({d,n:(o.d===d?o.n:0)+1}));}catch(e){} updateQuota();}
+function minsLeft(){return Math.max(0,Math.floor((DAY_REQ-usageCount())/REQ_PER_MIN));}
+function updateQuota(){
+  const q=$("quota"); if(!q)return;
+  if(proOn()){
+    q.style.display="flex";
+    $("quotaTxt").textContent="~"+minsLeft()+" min";
+    $("quotaBar").style.width=Math.max(0,100-(usageCount()/DAY_REQ*100))+"%";
+  } else q.style.display="none";
+}
 function proStatus(){
   $("proStatus").innerHTML=proOn()
     ?'<b style="color:var(--green)">● Pro mode ON</b> — auto language detection + AI meeting notes'
     :'<span style="color:var(--dim)">○ Off — using free single-language browser transcription</span>';
   $("proBtn").style.color=proOn()?"var(--green)":"var(--dim)";
   $("proBtn").style.borderColor=proOn()?"var(--green)":"var(--line)";
+  $("lang").style.display=proOn()?"none":"block";
+  $("autoBadge").style.display=proOn()?"inline-flex":"none";
+  updateQuota();
 }
 $("proBtn").addEventListener("click",()=>{
   const b=$("proBox"); b.style.display=b.style.display==="none"?"block":"none";
@@ -326,6 +346,7 @@ const T_PROMPT="Transcribe this audio verbatim. The speech may mix English, Chin
 let pending=0, draft="";
 async function transcribeChunk(blob,t0,recId){
   pending++;
+  bumpUsage();
   try{
     const b64=await blobToWavB64(blob);
     const text=(await gemini([{inline_data:{mime_type:"audio/wav",data:b64}},{text:T_PROMPT}],T_MODELS)).trim();
@@ -462,7 +483,6 @@ function setLang(l){
     toast("Transcribing: "+($("lang").selectedOptions[0]?.textContent||l));
   }
 }
-document.querySelectorAll(".lchip").forEach(c=>c.addEventListener("click",()=>setLang(c.dataset.l)));
 updateChips();
 function startRecog(){
   if(!SR)return;
@@ -508,14 +528,14 @@ async function startRec(){
   startRecog();
   if(proOn()){
     spawnChunk();
-    chunkTimer=setInterval(()=>{ if(recActive&&!paused){ try{chunkRec.stop();}catch(e){} spawnChunk(); } },15000);
-    toast("⚡ Pro AI: auto language detection on");
+    chunkTimer=setInterval(()=>{ if(recActive&&!paused){ try{chunkRec.stop();}catch(e){} spawnChunk(); } },10000);
+    toast("⚡ Speak any language — AI auto-detects");
   }
   if(navigator.wakeLock){ navigator.wakeLock.request("screen").then(w=>wakeLock=w).catch(()=>{}); }
   $("recBtn").classList.add("on","pulse");
   $("pauseBtn").classList.add("show");
   $("discardBtn").classList.add("show");
-  $("recHint").textContent="Recording… tap the square to stop & save. Tap a language chip to switch anytime.";
+  $("recHint").textContent=proOn()?"Recording… speak any language, the AI auto-detects. Tap the square to stop & save.":"Recording… tap the square to stop & save.";
   $("live").classList.remove("idle");
   $("live").textContent="Listening…";
 }
