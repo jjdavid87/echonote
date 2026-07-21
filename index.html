@@ -38,8 +38,13 @@
   .recWrap{background:linear-gradient(160deg,var(--card),var(--card2)); border:1px solid var(--line); border-radius:20px; padding:18px; margin-bottom:18px}
   .timer{text-align:center; font-size:40px; font-weight:200; font-variant-numeric:tabular-nums; letter-spacing:2px; margin:4px 0 10px}
   canvas#wave{width:100%; height:56px; display:block; margin-bottom:10px}
-  .live{min-height:20px; max-height:110px; overflow-y:auto; font-size:14px; line-height:1.55; color:var(--dim); margin-bottom:14px; text-align:center}
+  .live{min-height:64px; max-height:38vh; overflow-y:auto; font-size:16px; line-height:1.7; color:var(--dim); margin-bottom:14px; text-align:left; background:rgba(0,0,0,.18); border-radius:12px; padding:10px 12px}
   .live .fin{color:var(--text)}
+  .live .int{color:var(--accent2)}
+  .live.idle{text-align:center; background:none; color:var(--dim)}
+  .langChips{display:flex; gap:8px; margin-bottom:10px; justify-content:center; flex-wrap:wrap}
+  .lchip{background:var(--card); border:1px solid var(--line); color:var(--dim); border-radius:99px; padding:7px 16px; font-size:13px; cursor:pointer}
+  .lchip.on{background:var(--card2); color:var(--text); border-color:var(--accent); font-weight:600}
   .ctrls{display:flex; align-items:center; justify-content:center; gap:26px}
   .recBtn{
     width:76px; height:76px; border-radius:50%; border:none; cursor:pointer;
@@ -101,6 +106,8 @@
 <div class="view active" id="homeView">
   <header>
     <h1>Echo<span>Note</span></h1>
+    <span style="display:flex;gap:8px;align-items:center">
+    <button id="proBtn" style="background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:99px;padding:6px 12px;font-size:12px;cursor:pointer">⚡ Pro</button>
     <select id="lang" title="Transcription language">
       <option value="en-US">English (US)</option>
       <option value="en-GB">English (UK)</option>
@@ -117,7 +124,19 @@
       <option value="vi-VN">Tiếng Việt</option>
       <option value="th-TH">ไทย</option>
     </select>
+    </span>
   </header>
+
+  <div class="banner" id="proBox" style="display:none">
+    <b>⚡ Pro AI mode (Google Gemini)</b> — auto-detects mixed languages (English / 中文 / Melayu / 100+) in the same recording, and writes real AI meeting notes: summary, key points, action items, decisions.<br><br>
+    1. Get a <b>free</b> API key at <b>aistudio.google.com/apikey</b> (Google account, no card needed)<br>
+    2. Paste it below — stored only on your phone:
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="gkey" type="password" placeholder="AIza..." style="flex:1;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--text);font-size:13px">
+      <button class="btn" id="gkeySave" style="flex:0 0 auto">Save</button>
+    </div>
+    <div id="proStatus" style="margin-top:8px"></div>
+  </div>
 
   <div class="banner" id="installTip"><span class="x" onclick="dismissTip()">✕</span><b>Tip:</b> in Chrome, tap ⋮ → <b>Install app</b> (or “Add to Home Screen”) to install EchoNote as a real app. Everything stays on your phone — no account, no cloud, no cost.</div>
   <div class="banner" id="noSpeech" style="display:none"><b>Heads up:</b> live transcription isn’t supported in this browser. Audio recording still works. For transcripts, use Chrome on Android or a computer.</div>
@@ -126,7 +145,12 @@
   <div class="recWrap">
     <div class="timer" id="timer">00:00</div>
     <canvas id="wave"></canvas>
-    <div class="live" id="live">Tap the mic to start recording</div>
+    <div class="langChips" id="langChips">
+      <button class="lchip" data-l="en-US">English</button>
+      <button class="lchip" data-l="zh-CN">中文</button>
+      <button class="lchip" data-l="ms-MY">Melayu</button>
+    </div>
+    <div class="live idle" id="live">Tap the mic to start recording</div>
     <div class="ctrls">
       <button class="sideBtn" id="pauseBtn" title="Pause">⏸</button>
       <button class="recBtn" id="recBtn"><div class="ic"></div></button>
@@ -187,7 +211,7 @@ function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show")
 function dismissTip(){$("installTip").style.display="none";try{localStorage.setItem("en_tip","1");}catch(e){}}
 try{if(localStorage.getItem("en_tip"))$("installTip").style.display="none";
     const sv=localStorage.getItem("en_lang");if(sv)$("lang").value=sv;}catch(e){}
-$("lang").addEventListener("change",()=>{try{localStorage.setItem("en_lang",$("lang").value);}catch(e){}});
+$("lang").addEventListener("change",()=>setLang($("lang").value));
 
 /* ================= Summarizer (free, on-device) ================= */
 const STOP=new Set(("a,an,the,and,or,but,so,if,then,than,that,this,these,those,is,am,are,was,were,be,been,being,do,does,did,doing,have,has,had,having,i,me,my,we,our,you,your,he,him,his,she,her,it,its,they,them,their,of,in,on,at,to,for,with,from,by,about,as,into,like,through,after,before,over,under,again,also,just,very,really,quite,there,here,what,which,who,whom,when,where,why,how,not,no,yes,yeah,ok,okay,um,uh,hmm,well,know,think,going,gonna,got,get,one,two,can,could,will,would,should,shall,may,might,must,dont,don't,didnt,didn't,im,i'm,its,it's,thats,that's,youre,you're,were,we're,ive,i've,lets,let's,us,now,right,actually,basically,literally,mean,say,said,see,want,need,go,come,make,made,take,took,thing,things,stuff,lot,bit,kind,sort").split(","));
@@ -233,6 +257,134 @@ function autoTitle(rec){
   }
   return "Recording "+new Date(rec.date).toLocaleDateString();
 }
+
+/* ================= Pro AI (Gemini) ================= */
+const GKEY="en_gkey";
+const getKey=()=>{try{return localStorage.getItem(GKEY)||"";}catch(e){return "";}};
+const proOn=()=>!!getKey();
+function proStatus(){
+  $("proStatus").innerHTML=proOn()
+    ?'<b style="color:var(--green)">● Pro mode ON</b> — auto language detection + AI meeting notes'
+    :'<span style="color:var(--dim)">○ Off — using free single-language browser transcription</span>';
+  $("proBtn").style.color=proOn()?"var(--green)":"var(--dim)";
+  $("proBtn").style.borderColor=proOn()?"var(--green)":"var(--line)";
+}
+$("proBtn").addEventListener("click",()=>{
+  const b=$("proBox"); b.style.display=b.style.display==="none"?"block":"none";
+  $("gkey").value=getKey(); proStatus();
+});
+$("gkeySave").addEventListener("click",()=>{
+  try{localStorage.setItem(GKEY,$("gkey").value.trim());}catch(e){}
+  proStatus(); toast(proOn()?"⚡ Pro AI enabled":"Pro AI disabled");
+});
+proStatus();
+
+const MODELS=["gemini-flash-latest","gemini-2.5-flash","gemini-3.5-flash","gemini-2.0-flash"];
+let modelIdx=0;
+async function gemini(parts){
+  let lastErr;
+  for(let i=modelIdx;i<MODELS.length;i++){
+    try{
+      const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+MODELS[i]+":generateContent?key="+encodeURIComponent(getKey()),{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts}]})
+      });
+      if(r.status===404){lastErr=new Error("404");continue;}
+      if(!r.ok) throw new Error("API error "+r.status);
+      modelIdx=i;
+      const j=await r.json();
+      return (j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(p=>p.text||"").join("");
+    }catch(e){lastErr=e; if(String(e).indexOf("404")<0) throw e;}
+  }
+  throw lastErr||new Error("No Gemini model available");
+}
+async function blobToWavB64(blob){
+  const ab=await blob.arrayBuffer();
+  const ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
+  const buf=await ac.decodeAudioData(ab);
+  ac.close();
+  const ch=buf.getChannelData(0), n=ch.length, sr=buf.sampleRate;
+  const out=new DataView(new ArrayBuffer(44+n*2));
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)out.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,"RIFF");out.setUint32(4,36+n*2,true);ws(8,"WAVE");ws(12,"fmt ");
+  out.setUint32(16,16,true);out.setUint16(20,1,true);out.setUint16(22,1,true);
+  out.setUint32(24,sr,true);out.setUint32(28,sr*2,true);out.setUint16(32,2,true);out.setUint16(34,16,true);
+  ws(36,"data");out.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,ch[i]));out.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+  const bytes=new Uint8Array(out.buffer);
+  let bin=""; const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(bin);
+}
+const T_PROMPT="Transcribe this audio verbatim. The speech may mix English, Chinese (Mandarin), Malay, or other languages in the same sentence — keep every part in its original language and script (Chinese in 汉字, Malay/English in Latin). Output ONLY the transcript text, nothing else. If there is no clear speech, output nothing.";
+let pending=0, draft="";
+async function transcribeChunk(blob,t0,recId){
+  pending++;
+  try{
+    const b64=await blobToWavB64(blob);
+    const text=(await gemini([{inline_data:{mime_type:"audio/wav",data:b64}},{text:T_PROMPT}])).trim();
+    if(text){
+      if(recActive){
+        segments.push({t:t0,text}); segments.sort((a,b)=>a.t-b.t);
+        draft=""; renderLive();
+      } else if(recId){
+        let r=await dbGet(recId);
+        if(!r){ await new Promise(x=>setTimeout(x,1500)); r=await dbGet(recId); }
+        if(r){ r.segments.push({t:t0,text}); r.segments.sort((a,b)=>a.t-b.t); await dbPut(r);
+          if(cur&&cur.id===recId){cur=r;renderTranscript();} }
+      }
+    }
+  }catch(e){ toast("⚡ Pro transcription failed — check API key / internet"); }
+  finally{ pending--; }
+}
+const N_PROMPT=t=>"You are an expert meeting-notes assistant. From this transcript (which may mix English, Chinese and Malay), write professional meeting notes IN THE SAME dominant language(s) as the transcript, using exactly this structure:\n## Summary\n2-4 sentences.\n## Key Points\n- bullets\n## Action Items\n- bullets, include owner and deadline if mentioned (write 'None' if none)\n## Decisions\n- bullets (write 'None' if none)\n\nTranscript:\n"+t;
+async function genNotes(recId){
+  if(!proOn())return;
+  const r=await dbGet(recId); if(!r)return;
+  const t=(r.segments||[]).map(s=>s.text).join(" ").trim();
+  if(!t)return;
+  try{
+    const notes=(await gemini([{text:N_PROMPT(t)}])).trim();
+    const r2=await dbGet(recId); if(!r2)return;
+    r2.notes=notes; await dbPut(r2);
+    if(cur&&cur.id===recId){cur=r2;renderSummary();}
+    toast("✨ AI meeting notes ready");
+  }catch(e){ toast("AI notes failed — open the recording and tap Generate"); }
+}
+const waitPending=()=>new Promise(res=>{
+  const t0=Date.now();
+  const h=setInterval(()=>{ if(pending===0||Date.now()-t0>30000){clearInterval(h);res();} },400);
+});
+let chunkRec=null, chunkTimer=null, savedRecId=null;
+function spawnChunk(){
+  if(!stream)return;
+  const t0=elapsed(), parts=[];
+  const mime=pickMime();
+  const cr=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  cr.ondataavailable=e=>{if(e.data.size)parts.push(e.data);};
+  cr.onstop=()=>{
+    const b=new Blob(parts,{type:cr.mimeType||"audio/webm"});
+    if(b.size>2000) transcribeChunk(b,Math.max(0,t0),savedRecId);
+  };
+  cr.start(); chunkRec=cr;
+}
+function mdlite(t){
+  const lines=t.split(/\r?\n/); let h="",inUl=false;
+  const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+  for(let L of lines){
+    L=L.trim();
+    const li=/^[-*•] +(.*)/.exec(L);
+    if(li){ if(!inUl){h+='<ul style="padding-left:18px;margin:4px 0 10px">';inUl=true;} h+="<li>"+inline(li[1])+"</li>"; continue; }
+    if(inUl){h+="</ul>";inUl=false;}
+    if(!L)continue;
+    const hd=/^#{1,4} +(.*)/.exec(L);
+    if(hd){h+='<h3 style="margin:12px 0 6px;color:var(--blue);font-size:13px;letter-spacing:.5px">'+inline(hd[1]).toUpperCase()+"</h3>";continue;}
+    h+='<p style="margin:4px 0;font-size:14px;line-height:1.6">'+inline(L)+"</p>";
+  }
+  if(inUl)h+="</ul>";
+  return h;
+}
+window.genNotes=genNotes;
 
 /* ================= Recorder ================= */
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -282,12 +434,30 @@ function drawWave(){
     }
   })();
 }
+const noSpaceLang=l=>/^(zh|ja|th)/.test(l||"");
 function renderLive(){
   const el=$("live");
-  const last=segments.slice(-2).map(s=>'<span class="fin">'+esc(s.text)+'</span>').join(" ");
-  el.innerHTML=(last?last+" ":"")+esc(interim);
+  el.classList.remove("idle");
+  const sep=noSpaceLang($("lang").value)?"":" ";
+  const fin=segments.map(s=>esc(s.text)).join(sep);
+  el.innerHTML='<span class="fin">'+fin+'</span>'+sep+'<span class="int">'+esc((proOn()?draft:"")+interim)+'</span>';
   el.scrollTop=el.scrollHeight;
 }
+function updateChips(){
+  document.querySelectorAll(".lchip").forEach(c=>c.classList.toggle("on",c.dataset.l===$("lang").value));
+}
+function setLang(l){
+  $("lang").value=l;
+  try{localStorage.setItem("en_lang",l);}catch(e){}
+  updateChips();
+  if(recActive&&!paused){
+    if(recog){try{recog.onend=null;recog.stop();}catch(e){}}
+    startRecog();
+    toast("Transcribing: "+($("lang").selectedOptions[0]?.textContent||l));
+  }
+}
+document.querySelectorAll(".lchip").forEach(c=>c.addEventListener("click",()=>setLang(c.dataset.l)));
+updateChips();
 function startRecog(){
   if(!SR)return;
   recog=new SR();
@@ -300,7 +470,10 @@ function startRecog(){
       const r=e.results[i];
       if(r.isFinal){
         const t=r[0].transcript.trim();
-        if(t)segments.push({t:Math.max(0,elapsed()-2),text:t});
+        if(t){
+          if(proOn()) draft+=t+" ";   // preview only — Gemini provides the real transcript
+          else segments.push({t:Math.max(0,elapsed()-2),text:t});
+        }
       } else interim+=r[0].transcript;
     }
     renderLive();
@@ -313,7 +486,7 @@ async function startRec(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ micError(null); return; }
   try{ stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); }
   catch(e){ micError(e); return; }
-  chunks=[];segments=[];interim="";pausedTotal=0;paused=false;
+  chunks=[];segments=[];interim="";draft="";pausedTotal=0;paused=false;savedRecId=null;
   const mime=pickMime();
   mediaRec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
   mediaRec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
@@ -327,16 +500,25 @@ async function startRec(){
   src.connect(analyser);
   drawWave();
   startRecog();
+  if(proOn()){
+    spawnChunk();
+    chunkTimer=setInterval(()=>{ if(recActive&&!paused){ try{chunkRec.stop();}catch(e){} spawnChunk(); } },15000);
+    toast("⚡ Pro AI: auto language detection on");
+  }
   if(navigator.wakeLock){ navigator.wakeLock.request("screen").then(w=>wakeLock=w).catch(()=>{}); }
   $("recBtn").classList.add("on","pulse");
   $("pauseBtn").classList.add("show");
   $("discardBtn").classList.add("show");
-  $("recHint").textContent="Recording… tap the square to stop & save.";
+  $("recHint").textContent="Recording… tap the square to stop & save. Tap a language chip to switch anytime.";
+  $("live").classList.remove("idle");
   $("live").textContent="Listening…";
 }
 function cleanup(){
   recActive=false;
   clearInterval(timerH); cancelAnimationFrame(rafH);
+  clearInterval(chunkTimer); chunkTimer=null;
+  if(chunkRec){ chunkRec.onstop=null; try{chunkRec.stop();}catch(e){} chunkRec=null; }
+  draft="";
   if(recog){try{recog.stop();}catch(e){} recog=null;}
   if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;}
   if(audioCtx){audioCtx.close().catch(()=>{}); audioCtx=null;}
@@ -347,12 +529,15 @@ function cleanup(){
   $("pauseBtn").textContent="⏸";
   $("timer").textContent="00:00";
   $("recHint").textContent="Records audio + live transcript. AI notes generated on save.";
+  $("live").classList.add("idle");
   $("live").textContent="Tap the mic to start recording";
   const cv=$("wave");cv.getContext("2d").clearRect(0,0,cv.width,cv.height);
 }
 async function stopSave(){
   const dur=elapsed();
   recActive=false;
+  clearInterval(chunkTimer); chunkTimer=null;
+  const finalChunk=chunkRec; chunkRec=null;
   await new Promise(res=>{
     mediaRec.onstop=res;
     try{mediaRec.stop();}catch(e){res();}
@@ -364,12 +549,15 @@ async function stopSave(){
     segments:segments.slice(), lang:$("lang").value, title:""
   };
   rec.title=autoTitle(rec);
+  savedRecId=rec.id;
   cleanup();
-  if(dur<1){ toast("Too short — discarded"); return; }
+  if(dur<1){ savedRecId=null; toast("Too short — discarded"); return; }
   await dbPut(rec);
-  toast("Saved ✓ AI notes ready");
+  if(proOn()&&finalChunk){ try{finalChunk.stop();}catch(e){} }
+  toast(proOn()?"Saved ✓ generating AI meeting notes…":"Saved ✓ AI notes ready");
   renderList();
   openDetail(rec.id);
+  if(proOn()){ waitPending().then(()=>genNotes(rec.id)); }
 }
 $("recBtn").addEventListener("click",()=>{ recActive? stopSave() : startRec(); });
 $("pauseBtn").addEventListener("click",()=>{
@@ -378,12 +566,14 @@ $("pauseBtn").addEventListener("click",()=>{
     paused=true; pausedAt=Date.now();
     try{mediaRec.pause();}catch(e){}
     if(recog){try{recog.stop();}catch(e){}}
+    if(proOn()&&chunkRec){try{chunkRec.stop();}catch(e){} chunkRec=null;}
     $("pauseBtn").textContent="▶";
     $("recBtn").classList.remove("pulse");
   } else {
     pausedTotal+=Date.now()-pausedAt; paused=false;
     try{mediaRec.resume();}catch(e){}
     startRecog();
+    if(proOn())spawnChunk();
     $("pauseBtn").textContent="⏸";
     $("recBtn").classList.add("pulse");
   }
@@ -439,6 +629,18 @@ async function openDetail(id){
 }
 function renderSummary(){
   const p=$("p-sum");
+  if(cur.notes){
+    p.innerHTML='<div class="sumCard"><h3 style="color:var(--amber)">✨ AI MEETING NOTES</h3>'+mdlite(cur.notes)+'</div>'+
+      '<button class="btn" style="width:100%" onclick="genNotes(cur.id)">🔄 Regenerate notes</button>';
+    return;
+  }
+  if(proOn()&&(cur.segments||[]).length){
+    p.innerHTML='<div class="banner">⚡ Pro AI notes not generated yet.</div>'+
+      '<button class="btn" style="width:100%;margin-bottom:12px" onclick="genNotes(cur.id);this.textContent=\'⏳ Generating…\'">✨ Generate AI meeting notes</button>';
+    const s0=summarize(cur);
+    if(s0) p.innerHTML+='<div class="sumCard ov"><h3>📋 QUICK OVERVIEW</h3><p>'+esc(s0.overview)+'</p></div>';
+    return;
+  }
   const s=summarize(cur);
   if(!s){ p.innerHTML='<div class="empty">No transcript captured for this recording, so AI notes aren\'t available. (Transcription needs Chrome.)</div>'; return; }
   let h='<div class="sumCard ov"><h3>📋 OVERVIEW</h3><p>'+esc(s.overview)+'</p></div>';
@@ -489,6 +691,12 @@ $("dlAudio").addEventListener("click",()=>{
 function notesText(){
   const s=summarize(cur);
   let out="🎙 "+cur.title+"\n"+new Date(cur.date).toLocaleString()+" · "+fmt(cur.duration)+"\n\n";
+  if(cur.notes){
+    out+=cur.notes+"\n\n";
+    const segs0=cur.segments||[];
+    if(segs0.length) out+="FULL TRANSCRIPT\n"+segs0.map(x=>"["+fmt(x.t)+"] "+x.text).join("\n");
+    return out;
+  }
   if(s){
     out+="OVERVIEW\n"+s.overview+"\n\n";
     if(s.keyPoints.length) out+="KEY POINTS\n"+s.keyPoints.map(k=>"• "+k.text).join("\n")+"\n\n";
@@ -512,7 +720,8 @@ $("shareBtn").addEventListener("click",async()=>{
 
 /* ================= boot ================= */
 openDB().then(renderList).catch(()=>{ $("list").innerHTML='<div class="empty">Storage unavailable in this browser.</div>'; });
-window.seek=seek; window.dismissTip=dismissTip;
+window.seek=seek; window.dismissTip=dismissTip; window.cur=cur;
+Object.defineProperty(window,"cur",{get:()=>cur});
 if("serviceWorker" in navigator && location.protocol==="https:"){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
